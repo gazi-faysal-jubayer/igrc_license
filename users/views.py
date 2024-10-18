@@ -46,23 +46,41 @@ def login_superuser(request):
     else:
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
     
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import api_view, permission_classes
+import random
+import string
+from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework import status
 from .models import Agency
 from .serializers import AgencySerializer
+from rest_framework.permissions import IsAuthenticated
 
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_agency_view(request):
-    if request.method == 'POST':
-        serializer = AgencySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+def generate_random_password(length=8):
+    # Generate a random password of specified length
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
 
+class CreateAgencyView(generics.CreateAPIView):
+    queryset = Agency.objects.all()
+    serializer_class = AgencySerializer
+    permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        # Generate a random password
+        random_password = generate_random_password()
+
+        # Set the created_by field to the current user
+        agency = serializer.save(created_by=self.request.user)
+
+        # Optionally, if you want to create a user account for the agency:
+        user = User.objects.create_user(username=agency.name, password=random_password)
+        
+        # Return the agency data along with the generated password
+        return Response({
+            'agency': serializer.data,
+            'password': random_password
+        }, status=status.HTTP_201_CREATED)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return self.perform_create(serializer)
