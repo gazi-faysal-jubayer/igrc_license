@@ -3,6 +3,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate, login
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
+
+def csrf_token_view(request):
+    token = get_token(request)
+    return JsonResponse({'csrfToken': token})
+
 
 @api_view(['POST'])
 def signup_superuser(request):
@@ -40,18 +47,22 @@ def login_superuser(request):
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
     
 from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import generics
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
 from .models import Agency
 from .serializers import AgencySerializer
 
-@method_decorator(csrf_exempt, name='dispatch')
-class CreateAgencyView(generics.CreateAPIView):
-    queryset = Agency.objects.all()
-    serializer_class = AgencySerializer
-    permission_classes = [IsAuthenticated]
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_agency_view(request):
+    if request.method == 'POST':
+        serializer = AgencySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def perform_create(self, serializer):
-        serializer.save()
 
