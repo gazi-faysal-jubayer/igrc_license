@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import status
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate, login
@@ -114,3 +115,38 @@ class AgencyLoginView(ObtainAuthToken):
                 'email': user.email
             })
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AgencyListView(APIView):
+    def get(self, request):
+        agencies = Agency.objects.all()
+        serializer = AgencySerializer(agencies, many=True)
+        return Response(serializer.data)
+    
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from .models import License
+from .serializers import LicenseSerializer
+
+class LicenseListView(APIView):
+    def get(self, request):
+        licenses = License.objects.all()
+        serializer = LicenseSerializer(licenses, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = LicenseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class LicenseDetailView(APIView):
+    def get(self, request, pk):
+        try:
+            license = License.objects.get(pk=pk)
+        except License.DoesNotExist:
+            return Response({'error': 'License not found'}, status=status.HTTP_404_NOT_FOUND)
+        serializer = LicenseSerializer(license)
+        return Response(serializer.data)
